@@ -10,10 +10,12 @@ def getCorrespondence(imageA, imageB):
 	figA = fig.add_subplot(1,2,1)
 	figB = fig.add_subplot(1,2,2)
 	# Display the image
-	figA.imshow(imageA,origin='lower')
-	figB.imshow(imageB,origin='lower')
+	# lower use to flip the image
+	figA.imshow(imageA)#,origin='lower')
+	figB.imshow(imageB)#,origin='lower')
 	plt.axis('image')
-	pts = plt.ginput(n=0, timeout=0)
+	# n = number of points to read
+	pts = plt.ginput(n=8, timeout=0)
 	print(pts);
 	pts = np.reshape(pts, (2, 4, 2))
 	return pts
