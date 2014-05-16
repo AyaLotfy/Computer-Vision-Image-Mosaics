@@ -38,6 +38,20 @@ def transform(point,h):
 	ret[2] = 1;
 	return ret;
 
+def InvTransform(point,h):
+	h_2d = np.zeros((3,3));
+	for i in range(0,3):
+		for j in range(0,3):
+			if 3*i+j < 8:
+				h_2d[i][j] = h[3*i+j];
+	h_2d[2][2] = 1;
+#	print('h_2d ' + str(h_2d));
+	ret = np.dot(np.linalg.inv(h_2d), point);
+	ret[0] = ret[0]/ret[2];
+	ret[1] = ret[1]/ret[2];
+	ret[2] = 1;
+	return ret;
+
 # calcuate H matrix using n matched points from get_correspondence
 def calcH(pts):
 	# SOLVE b = A h
@@ -64,25 +78,71 @@ def calcH(pts):
 #	print('shapes for A, h, b, reconstructed ' + str(A.shape) + str(h.shape) + str(b.shape) + str(reconstructedB.shape));
 	return h;
 
+#========================== NEW WRAP IMAGE
+
 def wrapImage(sourceImage , h):
 	# here we return new sourceImage with (2*width,2*height), and transform our image into destination .. with interpolating
 	height = sourceImage.shape[0];
 	width = sourceImage.shape[1];
-	print(str(height) + ' ' + str(width) + '\n');
-	destinationImage = np.zeros((4*height,4*width,3));
+
+	min_mapped_i = int(100000);
+	min_mapped_j = int(100000);
+	max_mapped_i = max_mapped_j = int(-100000);
+
+	# calculate bounds of new image
+
 	for i in range(0,height):
 		for j in range(0, width):
 			# perform multiplication	TODO add width,heigh shift
 			mappedPos = transform(np.array([[i],[j],[1]]), h);
 			# let's
-			if height + mappedPos[0][0] < 4*height and  height + mappedPos[0][0] > 0 and  width + mappedPos[1][0] < 4*width and  width + mappedPos[1][0] > 0:
-				destinationImage[height+mappedPos[0][0]][width+mappedPos[1][0]] = sourceImage[i][j];
+			mapped_i = int(mappedPos[0][0])
+			mapped_j = int(mappedPos[1][0])
+			# update bounding box!
+			if mapped_i < min_mapped_i:
+				min_mapped_i = mapped_i
+			if mapped_i > max_mapped_i:
+				max_mapped_i = mapped_i
+			if mapped_j < min_mapped_j:
+				min_mapped_j = mapped_j
+			if mapped_j > max_mapped_j:
+				max_mapped_j =mapped_j
 
-#	scipy.misc.imsave('outfile.jpg', destinationImage)
-	im = Image.fromarray(destinationImage, "RGB");
-	im.save("your_file.jpeg");
+	newHeight = (max_mapped_i-min_mapped_i+1);
+	newWidth = (max_mapped_j-min_mapped_j+1);
 
-#	return 0;
+	shiftHeight = - min_mapped_i;
+	shiftWidth = - min_mapped_j;
+
+	destinationImage = np.zeros((newHeight,newWidth,3), dtype=np.uint8);
+
+	# write to the new image!
+
+	for i in range(0,height):
+		for j in range(0, width):
+			mappedPos = transform(np.array([[i],[j],[1]]), h);
+			mapped_i = int(mappedPos[0][0])
+			mapped_j = int(mappedPos[1][0])
+			destinationImage[mapped_i+shiftHeight][mapped_j+shiftWidth] = sourceImage[i][j];
+
+	im = Image.fromarray(destinationImage)
+	im.save("with_holes.jpg")
+
+	# let's Remove black holes FTW
+	for i in range(0, newHeight):
+		for j in range(0, newWidth):
+			# may be done in more neat way!
+			if int(destinationImage[i][j][0]) == 0 and int(destinationImage[i][j][1]) == 0 and int(destinationImage[i][j][2]) == 0:
+				# it's black let's get back to it's inverse!
+				inv_mapped_pos = InvTransform(np.array([[(i - shiftHeight)],[(j - shiftWidth)],[1]]), h)
+				inv_mapped_i = inv_mapped_pos[0][0]
+				inv_mapped_j = inv_mapped_pos[1][0]
+				if int(inv_mapped_i) < height and  int(inv_mapped_i) > -1 and  int(inv_mapped_j) < width and  int(inv_mapped_j) > -1:
+					destinationImage[i][j] = sourceImage[int(inv_mapped_i)][int(inv_mapped_j)]
+
+	im = Image.fromarray(destinationImage)
+	im.save("without_holes.jpg")
+	return destinationImage;
 
 def main():
 #	rrr = np.array([[1],[2],[3],[4]]);
@@ -93,9 +153,10 @@ def main():
 #	print(imageA);
 	imageB = mpimg.imread(fileB);
 	pts = getCorresp.getCorrespondence(imageA, imageB);
-	print(pts);
+#	print(pts);
 	h = calcH(pts);
-	print('H :' + str(h));
+#	print('H :' + str(h));
+	print(imageA);
 	#wrapping
 	wrapImage(imageA, h);
 main();

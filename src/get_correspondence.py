@@ -15,9 +15,10 @@ def getCorrespondence(imageA, imageB):
 	figB.imshow(imageB)#,origin='lower')
 	plt.axis('image')
 	# n = number of points to read
-	pts = plt.ginput(n=8, timeout=0)
-	print(pts);
-	pts = np.reshape(pts, (2, 4, 2))
+	num = 20;
+	pts = plt.ginput(n=num, timeout=0)
+#	print(pts);
+	pts = np.reshape(pts, (2, num/2, 2))
 	return pts
 
 if __name__ == "__main__":
