@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np;
 import matplotlib.image as mpimg;
 import get_correspondence as getCorresp;
@@ -194,19 +195,61 @@ def wrapAndMergeImage(sourceImage , h, refImage):
 
 	return destinationImage;
 
+
+
+def verifyH(imageA, imageB, h):
+	num = 400;
+	imageA_height = imageA.shape[0];
+	imageA_width = imageA.shape[1];
+	imageB_height = imageB.shape[0];
+	imageB_width = imageB.shape[1];
+
+	fig = plt.figure()
+	figA = fig.add_subplot(1,2,1)
+	figB = fig.add_subplot(1,2,2)
+	# Display the image
+	# lower use to flip the image
+	figA.imshow(imageA)#,origin='lower')
+	
+	prev = np.array([100000,1000000])
+
+	for k in range(0, num):
+		figB.imshow(imageB)#,origin='lower')
+		plt.axis('image')
+		# n = number of points to read
+		pts = plt.ginput(n=1, timeout=0)
+		j = pts[0][0]
+		i = pts[0][1];
+		print(str(i) + ' ' + str(j));
+		print(str(i-prev[0]) + ' ,, ' + str(j-prev[1]))
+		if abs(i-prev[0]) < 2 and abs(j-prev[1]) < 2:
+			return;
+		prev[0] = i;
+		prev[1] = j;
+		if  not(int(i) > -1 and int(i) < imageA_height and int(j) > -1 and int(j) < imageA_width):
+			return;
+		mappedPos = transform(np.array([[j],[i],[1]]), h);
+		mapped_i = mappedPos[1][0];
+		mapped_j = mappedPos[0][0];
+		for newi in range(int(mapped_i)-2, int(mapped_i)+3):
+			for newj in range(int(mapped_j)-2, int(mapped_j)+3):
+				if newi > -1 and newi < imageB_height and newj > -1 and newj < imageB_width:
+					imageB[int(newi)][int(newj)] = np.array([1,1,1]);
 def main():
-#	rrr = np.array([[1],[2],[3],[4]]);
-#	print(rrr.shape);
-	fileA = 'tower22.jpg';
-	fileB = 'tower11.jpg';
+	fileA = 'imageA.jpg';
+	fileB = 'imageB.jpg';
 	imageA = mpimg.imread(fileA);
 #	print(imageA);
 	imageB = mpimg.imread(fileB);
+
 	pts = getCorresp.getCorrespondence(imageA, imageB);
-#	print(pts);
+
 	h = calcH(pts);
 #	print('H :' + str(h));
 #	print(imageA);
 	#wrapping
+
 	wrapAndMergeImage(imageA, h, imageB);
+#	verifyH(imageA, imageB, h);
+
 main();
