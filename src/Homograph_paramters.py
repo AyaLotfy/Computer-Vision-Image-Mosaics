@@ -72,9 +72,9 @@ def calcH(pts):
 	#solve equation
 	h = np.linalg.lstsq(A, b)[0];
 
-#	for i in range(0,n):
-#		iniPoint = np.array([[getStartX(pts, i)], [getStartY(pts, i)], [1]]);
-#		print(' point ' + str(i) + '\n\t'+ str(np.array([[getEndX(pts, i)], [getEndY(pts, i)], [1]])) + '\n\t' + str(transform(iniPoint, h)));
+	for i in range(0,n):
+		iniPoint = np.array([[getStartX(pts, i)], [getStartY(pts, i)], [1]]);
+		print(' point ' + str(i) + '\n\t'+ str(np.array([[getEndX(pts, i)], [getEndY(pts, i)], [1]])) + '\n\t' + str(transform(iniPoint, h)));
 #	print('shapes for A, h, b, reconstructed ' + str(A.shape) + str(h.shape) + str(b.shape) + str(reconstructedB.shape));
 	return h;
 
@@ -92,23 +92,27 @@ def wrapAndMergeImage(sourceImage , h, refImage):
 	# calculate bounds of new image
 	print('Image A size ' + str(sourceImage.shape));
 
-	for i in range(0,height):
-		for j in range(0, width):
-			# perform multiplication	TODO add width,heigh shift
-			mappedPos = transform(np.array([[j],[i],[1]]), h);
-			# let's
-			mapped_j = int(mappedPos[0][0])
-			mapped_i = int(mappedPos[1][0])
-			# update bounding box!
-			if mapped_i < min_mapped_i:
-				min_mapped_i = mapped_i
-			if mapped_i > max_mapped_i:
-				max_mapped_i = mapped_i
-			if mapped_j < min_mapped_j:
-				min_mapped_j = mapped_j
-			if mapped_j > max_mapped_j:
-				max_mapped_j =mapped_j
 
+	# calcuate bounds only!
+	bounds = np.array([[0,0],[height-1, 0],[0, width-1],[height-1, width-1]]);
+	for k in range(0,4):
+		i = bounds[k][0]
+		j = bounds[k][1];
+		# perform multiplication
+		mappedPos = transform(np.array([[j],[i],[1]]), h);
+		# let's
+		mapped_j = int(mappedPos[0][0])
+		mapped_i = int(mappedPos[1][0])
+		# update bounding box!
+		if mapped_i < min_mapped_i:
+			min_mapped_i = mapped_i
+		if mapped_i > max_mapped_i:
+			max_mapped_i = mapped_i
+		if mapped_j < min_mapped_j:
+			min_mapped_j = mapped_j
+		if mapped_j > max_mapped_j:
+			max_mapped_j =mapped_j
+	
 	newHeight = (max_mapped_i-min_mapped_i+1);
 	newWidth = (max_mapped_j-min_mapped_j+1);
 
@@ -126,17 +130,17 @@ def wrapAndMergeImage(sourceImage , h, refImage):
 
 	# write to the new image!
 
-	for i in range(0,height):
-		for j in range(0, width):
-			mappedPos = transform(np.array([[j],[i],[1]]), h);
-			mapped_j = int(mappedPos[0][0])
-			mapped_i = int(mappedPos[1][0])
-			destinationImage[mapped_i+shiftHeight][mapped_j+shiftWidth] = sourceImage[i][j];
+#	for i in range(0,height):
+#		for j in range(0, width):
+#			mappedPos = transform(np.array([[j],[i],[1]]), h);
+#			mapped_j = int(mappedPos[0][0])
+#			mapped_i = int(mappedPos[1][0])
+#			destinationImage[mapped_i+shiftHeight][mapped_j+shiftWidth] = sourceImage[i][j];
 
-	im = Image.fromarray(destinationImage)
-	im.save("with_holes.jpg")
+#	im = Image.fromarray(destinationImage)
+#	im.save("with_holes.jpg")
 
-	# let's Remove black holes FTW
+	# let's Remove black holes
 	for i in range(0, newHeight):
 		for j in range(0, newWidth):
 			# may be done in more neat way!
@@ -145,20 +149,33 @@ def wrapAndMergeImage(sourceImage , h, refImage):
 				inv_mapped_pos = InvTransform(np.array([[(j - shiftWidth)], [(i - shiftHeight)],[1]]), h)
 				inv_mapped_j = inv_mapped_pos[0][0]
 				inv_mapped_i = inv_mapped_pos[1][0]
-				if int(inv_mapped_i) < height and  int(inv_mapped_i) > -1 and  int(inv_mapped_j) < width and  int(inv_mapped_j) > -1:
-					destinationImage[i][j] = sourceImage[int(inv_mapped_i)][int(inv_mapped_j)]
+				if inv_mapped_i <= height-1 and  inv_mapped_i >= 0 and inv_mapped_j <= width-1 and inv_mapped_j >= 0:
+					# 	using bilinear interpolation!
+					low_i = int(inv_mapped_i);
+					low_j = int(inv_mapped_j);
+					dist_i = inv_mapped_i - low_i;
+					dist_j = inv_mapped_j - low_j;
+					destinationImage[i][j] = (1-dist_i)*(1-dist_j)*sourceImage[low_i][low_j] + (1-dist_i)*(dist_j)*sourceImage[low_i][low_j+1] + (dist_i)*(1-dist_j)*sourceImage[low_i+1][low_j] + (dist_i)*(dist_j)*sourceImage[low_i+1][low_j+1];
+#					destinationImage[i][j] = sourceImage[int(inv_mapped_i)][int(inv_mapped_j)]
 
 	im = Image.fromarray(destinationImage)
 	im.save("without_holes.jpg")
-
-
 
 	# merge original image!
 	ref_image_height = refImage.shape[0]
 	ref_image_width = refImage.shape[1]
 
 	print('Ref-image size ' + str(refImage.shape))
-	mergedImage = np.zeros((newHeight + shiftHeight, newWidth + shiftWidth, 3), dtype=np.uint8);
+
+	mergedImage_height = ref_image_height + shiftHeight
+	if newHeight > mergedImage_height:
+		mergedImage_height = newHeight
+
+	mergedImage_width = ref_image_width + shiftWidth
+	if newWidth > mergedImage_width:
+		mergedImage_width = newWidth
+
+	mergedImage = np.zeros((mergedImage_height, mergedImage_width, 3), dtype=np.uint8);
 
 	# sketch the reference image
 	for i in range(0,ref_image_height):
@@ -180,8 +197,8 @@ def wrapAndMergeImage(sourceImage , h, refImage):
 def main():
 #	rrr = np.array([[1],[2],[3],[4]]);
 #	print(rrr.shape);
-	fileA = 'imageA.jpg';
-	fileB = 'imageB.jpg';
+	fileA = 'tower22.jpg';
+	fileB = 'tower11.jpg';
 	imageA = mpimg.imread(fileA);
 #	print(imageA);
 	imageB = mpimg.imread(fileB);
