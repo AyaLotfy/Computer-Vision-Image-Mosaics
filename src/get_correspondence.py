@@ -5,7 +5,8 @@ import matplotlib.image as mpimg
 # Manually identifies corresponding points from two views
 def getCorrespondence(imageA, imageB):
 	getAuto = int(1);
-	num = 8;
+#	num = 8;
+	num = 20;
 	if(getAuto == 0):
 		# Display images, select matching points
 		fig = plt.figure()
